@@ -31,7 +31,7 @@ CFLAGS=-std=c99 -Wall -g -Os -mmcu=${MCU} -DF_CPU=${F_CPU} -D${STDLIB} -I. -I${I
 
 TARGET=main
 SRCS=main.c
-LINUX_PORT=/dev/ttyUSB0
+LINUX_PORT=/dev/ttyS3
 
 all:
 	${CC} ${CFLAGS} -o ${TARGET}.bin ${SRCS}

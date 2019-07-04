@@ -3,7 +3,7 @@
 #include <util/delay.h>
 
 int main() {
-  const int kDelay = 500;
+  const int kDelay = 250;
 
   // Note: PB5 is pin 13 on the Uno which is the built-in LED.
   DDRB |= _BV(DDB5);
