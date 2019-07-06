@@ -1,3 +1,6 @@
 .vscode/
 *.bin
 *.hex
+*.eep
+*.elf
+*.o
