@@ -15,7 +15,7 @@
 MCU = atmega328p
 AVRDUDE_PROGRAMMER = arduino
 AVRDUDE_PORT = /dev/ttyUSB0
-INCPATH = third_party
+INCPATH = /usr/local/include/avr
 TARGET = main
  
 $(TARGET).hex: $(TARGET).asm
@@ -28,4 +28,4 @@ showfuses:
 	avrdude -c $(AVRDUDE_PROGRAMMER) -p $(MCU) -P $(AVRDUDE_PORT) -v 2>&1 |  grep "fuse reads" | tail -n2
  
 clean:
-	rm *.hex *.obj *.cof *.lst
+	rm *.hex *.obj *.lst
