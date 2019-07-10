@@ -21,7 +21,7 @@ TARGET = main
 $(TARGET).hex: $(TARGET).asm
 	avra -l $(TARGET).lst -I $(INCPATH) $(TARGET).asm
  
-flash:
+flash: $(TARGET).hex
 	avrdude -c $(AVRDUDE_PROGRAMMER) -p $(MCU) -P $(AVRDUDE_PORT) -U flash:w:$(TARGET).hex:i
  
 showfuses:

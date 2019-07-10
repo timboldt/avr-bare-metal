@@ -11,34 +11,33 @@
 ; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
-;
+
 ; ********************************************
 ; * AVR Assembler Experiments                *
 ; ********************************************
-;
+
 .NOLIST
 .INCLUDE "m328Pdef.inc"
 .LIST
-;
+
 ; ============================================
 ;      P O R T S   A N D   P I N S 
 ; ============================================
-;.EQU ledPort = PORTB
-;.EQU ledPinNumber = PB5
+.EQU ledPort = PORTB
+.EQU ledPinNumber = PB5
 
 ; ============================================
 ;    C O N S T A N T S   T O   C H A N G E 
 ; ============================================
-;.EQU kTimer0Compare =  0xF9
+.EQU clockOverflowCount = 256*1024
 
 ; ============================================
 ;  F I X + D E R I V E D   C O N S T A N T S 
 ; ============================================
-;
-; [Add all constants here that are not subject
-;  to change or calculated from constants]
-; Format: .EQU const = $ABCD
-;
+.EQU clockFrequency = 16000000
+.EQU overflowsPerSecond = clockFrequency / clockOverflowCount
+.EQU repetitions = overflowsPerSecond / 2  ; Counter overflow repititions for LED.
+
 ; ============================================
 ;   R E G I S T E R   D E F I N I T I O N S
 ; ============================================
@@ -51,7 +50,6 @@
 ; ============================================
 ;       S R A M   D E F I N I T I O N S
 ; ============================================
-;
 .DSEG
 .ORG  0x0100
 ; Format: Label: .BYTE N ; reserve N Bytes from Label:
@@ -69,7 +67,6 @@
 ;     I N T E R R U P T   S E R V I C E S
 ; ============================================
 TIMER0_OVF_ISR:
-.EQU repetitions = 40
     ; Save status register on stack.
     in rtempintr1, SREG
     push rtempintr1
@@ -81,9 +78,9 @@ TIMER0_OVF_ISR:
     brne TIMER0_OVF_Return
 
     ; Toggle the LED state.
-    ldi rtempintr1, 1<<PB5
+    ldi rtempintr1, 1<<ledPinNumber
     eor rledstate, rtempintr1
-    out PORTB, rledstate
+    out ledPort, rledstate
 
     ; Clear counters.
     clr rcounter
@@ -104,8 +101,8 @@ Main:
 	ldi rgeneral, LOW(RAMEND) ; Init LSB stack
 	out SPL,rgeneral
 
-    ; Set PB5 as an output pin.
-    sbi DDRB, PB5
+    ; Set ledPinNumber as an output pin.
+    sbi DDRB, ledPinNumber
 
     ; Init counter.
     clr rcounter
@@ -120,8 +117,8 @@ Main:
     ldi rgeneral, (1<<TOIE0) ; Enable overflow interrupt
     sts TIMSK0, rgeneral
 
-    ldi rledstate, 1<<PB5
-    out PORTB, rledstate
+    ldi rledstate, 1<<ledPinNumber
+    out ledPort, rledstate
 
     ; Enable sleep.
 	ldi rgeneral,1<<SE
@@ -134,6 +131,6 @@ Main:
 ; ============================================
 ;
 MainLoop:
-	; HACK sleep
+	sleep
 	nop ; dummy for wake up
 	rjmp MainLoop
