@@ -29,23 +29,24 @@
 ; ============================================
 ;    C O N S T A N T S   T O   C H A N G E 
 ; ============================================
-.EQU clockOverflowCount = 256*1024
+.EQU blinksPerSecond = 1
 
 ; ============================================
 ;  F I X + D E R I V E D   C O N S T A N T S 
 ; ============================================
-.EQU clockFrequency = 16000000
-.EQU overflowsPerSecond = clockFrequency / clockOverflowCount
-.EQU repetitions = overflowsPerSecond / 2  ; Counter overflow repititions for LED.
+.EQU cpuMHz = 16000000
+.EQU timer0ClockPeriod = 256*1024 ; 8-bit timer with 1024 prescalar.
+.EQU overflowsPerSecond = cpuMHz / timer0ClockPeriod
+.EQU maxTimer0Overflow = overflowsPerSecond \
+        / blinksPerSecond / 2  ; On+off == 2.
 
 ; ============================================
 ;   R E G I S T E R   D E F I N I T I O N S
 ; ============================================
 .DEF rgeneral = R16     ; General purpose working register.
-.DEF rtempintr1 = R17   ; Temporary working register in interrupts.
-.DEF rtempintr2 = R17   ; Temporary working register in interrupts.
-.DEF rcounter = R18     ; Blink counter.
-.DEF rledstate = R19    ; LED state.
+.DEF rint1 = R17        ; Temporary working register in interrupts.
+.DEF rint2 = R18        ; Temporary working register in interrupts.
+.DEF rcounter = R19     ; Timer 0 overflow counter.
 
 ; ============================================
 ;       S R A M   D E F I N I T I O N S
@@ -68,28 +69,29 @@
 ; ============================================
 TIMER0_OVF_ISR:
     ; Save status register on stack.
-    in rtempintr1, SREG
-    push rtempintr1
+    in rint1, SREG
+    push rint1
 
     ; Increase the counter.
-    ; After `repetitions` overflows, toggle the state.
+    ; After `maxTimer0Overflow` overflows, toggle the state.
     inc rcounter
-    cpi rcounter, repetitions
+    cpi rcounter, maxTimer0Overflow
     brne TIMER0_OVF_Return
 
     ; Toggle the LED state.
-    ldi rtempintr1, 1<<ledPinNumber
-    eor rledstate, rtempintr1
-    out ledPort, rledstate
+    in rint1, ledPort ; Get current LED output pin value.
+    ldi rint2, 1<<ledPinNumber
+    eor rint1, rint2 ; Toggle it.
+    out ledPort, rint1 ; Write it back.
 
     ; Clear counters.
     clr rcounter
-    clr rtempintr1
-    out TCNT0, rtempintr1
+    clr rint1
+    out TCNT0, rint1
 
 TIMER0_OVF_Return:
-    pop rtempintr1
-    out SREG, rtempintr1
+    pop rint1
+    out SREG, rint1
     reti
 
 ; ============================================
@@ -108,21 +110,21 @@ Main:
     clr rcounter
 
     ; Set up timer 0 to trigger every 4ms.
-    ;ldi rgeneral, 1<<WGM01 ; CTC mode
-    ;out TCCR0A, rgeneral
     clr rgeneral
-    out TCNT0, rgeneral
+    out TCNT0, rgeneral ; Clear timer counter.
     ldi rgeneral, (1<<CS02) | (1<<CS00) ; Prescaler 1024
     out TCCR0B, rgeneral
     ldi rgeneral, (1<<TOIE0) ; Enable overflow interrupt
     sts TIMSK0, rgeneral
 
-    ldi rledstate, 1<<ledPinNumber
-    out ledPort, rledstate
+    ; Turn LED on to start with.
+    ldi rgeneral, 1<<ledPinNumber
+    out ledPort, rgeneral
 
     ; Enable sleep.
 	ldi rgeneral,1<<SE
 	out MCUCR,rgeneral
+
     ; Enable interrupts and go.
 	sei
 ;
