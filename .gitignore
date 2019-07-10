@@ -4,3 +4,6 @@
 *.eep
 *.elf
 *.o
+*.cof
+*.lst
+*.obj

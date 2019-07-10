@@ -1,38 +1,36 @@
+; Copyright 2019 Google LLC
+;
+; Licensed under the Apache License, Version 2.0 (the "License");
+; you may not use this file except in compliance with the License.
+; You may obtain a copy of the License at
+;
+;     https://www.apache.org/licenses/LICENSE-2.0
+;
+; Unless required by applicable law or agreed to in writing, software
+; distributed under the License is distributed on an "AS IS" BASIS,
+; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+; See the License for the specific language governing permissions and
+; limitations under the License.
 ;
 ; ********************************************
-; * [Add Project title here]                 *
-; * [Add more info on software version here] *
-; * (C)20xx by [Add Copyright Info here]     *
+; * AVR Assembler Experiments                *
 ; ********************************************
 ;
-; Included header file for target AVR type
 .NOLIST
 .INCLUDE "m328Pdef.inc"
 .LIST
 ;
 ; ============================================
-;   H A R D W A R E   I N F O R M A T I O N   
-; ============================================
-;
-; [Add all hardware information here]
-;
-; ============================================
 ;      P O R T S   A N D   P I N S 
 ; ============================================
-;
-; [Add names for hardware ports and pins here]
-; Format: .EQU Controlportout = PORTA
-;         .EQU Controlportin = PINA
-;         .EQU LedOutputPin = PORTA2
-;
+;.EQU ledPort = PORTB
+;.EQU ledPinNumber = PB5
+
 ; ============================================
 ;    C O N S T A N T S   T O   C H A N G E 
 ; ============================================
-;
-; [Add all constants here that can be subject
-;  to change by the user]
-; Format: .EQU const = $ABCD
-;
+;.EQU kTimer0Compare =  0xF9
+
 ; ============================================
 ;  F I X + D E R I V E D   C O N S T A N T S 
 ; ============================================
@@ -44,67 +42,98 @@
 ; ============================================
 ;   R E G I S T E R   D E F I N I T I O N S
 ; ============================================
-;
-; [Add all register names here, include info on
-;  all used registers without specific names]
-; Format: .DEF rmp = R16
-.DEF rmp = R16 ; Multipurpose register
-;
+.DEF rgeneral = R16     ; General purpose working register.
+.DEF rtempintr1 = R17   ; Temporary working register in interrupts.
+.DEF rtempintr2 = R17   ; Temporary working register in interrupts.
+.DEF rcounter = R18     ; Blink counter.
+.DEF rledstate = R19    ; LED state.
+
 ; ============================================
 ;       S R A M   D E F I N I T I O N S
 ; ============================================
 ;
 .DSEG
-.ORG  0X0060
+.ORG  0x0100
 ; Format: Label: .BYTE N ; reserve N Bytes from Label:
-;
+
 ; ============================================
 ;   R E S E T   A N D   I N T   V E C T O R S
 ; ============================================
-;
 .CSEG
 .ORG $0000
-	rjmp Main ; Reset vector
-	reti ; Int vector 1
-	reti ; Int vector 2
-	reti ; Int vector 3
-	reti ; Int vector 4
-	reti ; Int vector 5
-	reti ; Int vector 6
-	reti ; Int vector 7
-	reti ; Int vector 8
-	reti ; Int vector 9
-;
+	rjmp Main
+.ORG OVF0addr
+    rjmp TIMER0_OVF_ISR
+
 ; ============================================
 ;     I N T E R R U P T   S E R V I C E S
 ; ============================================
-;
-; [Add all interrupt service routines here]
-;
+TIMER0_OVF_ISR:
+.EQU repetitions = 40
+    ; Save status register on stack.
+    in rtempintr1, SREG
+    push rtempintr1
+
+    ; Increase the counter.
+    ; After `repetitions` overflows, toggle the state.
+    inc rcounter
+    cpi rcounter, repetitions
+    brne TIMER0_OVF_Return
+
+    ; Toggle the LED state.
+    ldi rtempintr1, 1<<PB5
+    eor rledstate, rtempintr1
+    out PORTB, rledstate
+
+    ; Clear counters.
+    clr rcounter
+    clr rtempintr1
+    out TCNT0, rtempintr1
+
+TIMER0_OVF_Return:
+    pop rtempintr1
+    out SREG, rtempintr1
+    reti
+
 ; ============================================
 ;     M A I N    P R O G R A M    I N I T
 ; ============================================
 ;
 Main:
-; Init stack
-	ldi rmp, LOW(RAMEND) ; Init LSB stack
-	out SPL,rmp
-; Init Port B
-	ldi rmp,0 ; Direction Port B
-	out DDRB,rmp
-; [Add all other init routines here]
-	ldi rmp,1<<SE ; enable sleep
-	out MCUCR,rmp
+    ; Init stack
+	ldi rgeneral, LOW(RAMEND) ; Init LSB stack
+	out SPL,rgeneral
+
+    ; Set PB5 as an output pin.
+    sbi DDRB, PB5
+
+    ; Init counter.
+    clr rcounter
+
+    ; Set up timer 0 to trigger every 4ms.
+    ;ldi rgeneral, 1<<WGM01 ; CTC mode
+    ;out TCCR0A, rgeneral
+    clr rgeneral
+    out TCNT0, rgeneral
+    ldi rgeneral, (1<<CS02) | (1<<CS00) ; Prescaler 1024
+    out TCCR0B, rgeneral
+    ldi rgeneral, (1<<TOIE0) ; Enable overflow interrupt
+    sts TIMSK0, rgeneral
+
+    ldi rledstate, 1<<PB5
+    out PORTB, rledstate
+
+    ; Enable sleep.
+	ldi rgeneral,1<<SE
+	out MCUCR,rgeneral
+    ; Enable interrupts and go.
 	sei
 ;
 ; ============================================
 ;         P R O G R A M    L O O P
 ; ============================================
 ;
-Loop:
-	sleep ; go to sleep
+MainLoop:
+	; HACK sleep
 	nop ; dummy for wake up
-	rjmp loop ; go back to loop
-;
-; End of source code
-;
+	rjmp MainLoop

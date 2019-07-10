@@ -28,4 +28,4 @@ showfuses:
 	avrdude -c $(AVRDUDE_PROGRAMMER) -p $(MCU) -P $(AVRDUDE_PORT) -v 2>&1 |  grep "fuse reads" | tail -n2
  
 clean:
-	rm -f *.hex *.obj *.cof *.lst
+	rm *.hex *.obj *.cof *.lst
